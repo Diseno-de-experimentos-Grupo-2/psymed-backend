@@ -6,6 +6,7 @@ import com.closedsource.psymed.platform.iam.infrastructure.tokens.jwt.BearerToke
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -67,7 +68,7 @@ public class WebSecurityConfiguration {
         http.cors(configurer -> configurer.configurationSource(request -> {
             var cors = new CorsConfiguration();
             cors.setAllowedOrigins(List.of("*"));
-            cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+            cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
             cors.setAllowedHeaders(List.of("*"));
             return cors;
         }));
@@ -82,8 +83,11 @@ public class WebSecurityConfiguration {
                                 "/swagger-ui/**",
                                 "/swagger-resources/**",
                                 "/webjars/**",
-                                "/api/v1/professional-profiles"
+                                "/api/v1/professional-profiles",
+                                "/actuator/health"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/iot/devices/claim").authenticated()
+                        .requestMatchers("/api/iot/**").permitAll()
                         .anyRequest().authenticated());
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authorizationRequestFilter(), UsernamePasswordAuthenticationFilter.class);
