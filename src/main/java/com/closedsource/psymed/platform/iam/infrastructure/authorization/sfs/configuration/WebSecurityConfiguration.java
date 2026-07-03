@@ -78,12 +78,14 @@ public class WebSecurityConfiguration {
             cors.setAllowedOriginPatterns(originPatterns.isEmpty() ? List.of("*") : originPatterns);
             cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
             cors.setAllowedHeaders(List.of("*"));
+            cors.setMaxAge(3600L);
             return cors;
         }));
         http.csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exceptionHandling -> exceptionHandling.authenticationEntryPoint(unauthorizedRequestHandlerEntryPoint))
                 .sessionManagement(customizer -> customizer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/authentication/**",
                                 "/v3/api-docs/**",
