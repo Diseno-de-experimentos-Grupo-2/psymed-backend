@@ -45,21 +45,63 @@ public class IoTCommandServiceImpl implements IoTCommandService {
         if (alertRepository.existsByEdgeEventId(command.edgeEventId())) {
             return alertRepository.findByEdgeEventId(command.edgeEventId());
         }
-        var alert = alertRepository.save(new IoTAlert(command));
-        deviceRepository.findByDeviceId(command.deviceId()).ifPresent(d -> {
-            d.markSeen();
-            deviceRepository.save(d);
-        });
+
+        // The claimed device is the source of truth for the patient: ignore the
+        // patient_id supplied by the Edge and resolve it from the paired device.
+        var deviceOpt = deviceRepository.findByDeviceId(command.deviceId());
+        if (deviceOpt.isEmpty() || !deviceOpt.get().isClaimed()) {
+            return Optional.empty();
+        }
+        var device = deviceOpt.get();
+
+        var resolvedCommand = new ReceiveAlertFromEdgeCommand(
+            command.edgeEventId(),
+            command.deviceId(),
+            device.getPatientId(),
+            command.alertType(),
+            command.severity(),
+            command.message(),
+            command.detectedAt(),
+            command.heartRateBpm(),
+            command.temperatureC(),
+            command.humidityPercent()
+        );
+
+        var alert = alertRepository.save(new IoTAlert(resolvedCommand));
+        device.markSeen();
+        deviceRepository.save(device);
         return Optional.of(alert);
     }
 
     @Transactional
     @Override
     public Optional<DailyHealthSummary> handle(ReceiveDailySummaryCommand command) {
-        if (summaryRepository.existsByEdgeSummaryId(command.edgeSummaryId())) {
-            return summaryRepository.findByPatientIdAndSummaryDate(command.patientId(), command.date());
+        var deviceOpt = deviceRepository.findByDeviceId(command.deviceId());
+        if (deviceOpt.isEmpty() || !deviceOpt.get().isClaimed()) {
+            return Optional.empty();
         }
-        return Optional.of(summaryRepository.save(new DailyHealthSummary(command)));
+        var resolvedPatientId = deviceOpt.get().getPatientId();
+
+        if (summaryRepository.existsByEdgeSummaryId(command.edgeSummaryId())) {
+            return summaryRepository.findByPatientIdAndSummaryDate(resolvedPatientId, command.date());
+        }
+
+        var resolvedCommand = new ReceiveDailySummaryCommand(
+            command.edgeSummaryId(),
+            command.deviceId(),
+            resolvedPatientId,
+            command.date(),
+            command.riskLevel(),
+            command.summaryText(),
+            command.totalReadings(),
+            command.avgHeartRate(),
+            command.maxHeartRate(),
+            command.avgTemperatureC(),
+            command.alertCount(),
+            command.disconnectedMinutes(),
+            command.metricsJson()
+        );
+        return Optional.of(summaryRepository.save(new DailyHealthSummary(resolvedCommand)));
     }
 
     @Transactional
@@ -78,17 +120,16 @@ public class IoTCommandServiceImpl implements IoTCommandService {
     @Transactional
     @Override
     public ClaimIoTDeviceResult handle(ClaimIoTDeviceCommand command) {
-        var deviceOpt = deviceRepository.findByDeviceId(command.deviceId());
+        // Code-only pairing: the patient types a single pairing code; we look up
+        // the device by that code. No code match means an invalid code.
+        var deviceOpt = deviceRepository.findByPairingCode(command.pairingCode());
         if (deviceOpt.isEmpty()) {
-            return ClaimIoTDeviceResult.of(ClaimIoTDeviceResult.Status.DEVICE_NOT_FOUND);
+            return ClaimIoTDeviceResult.of(ClaimIoTDeviceResult.Status.INVALID_PAIRING_CODE);
         }
 
         var device = deviceOpt.get();
         if (device.isClaimed()) {
             return ClaimIoTDeviceResult.of(ClaimIoTDeviceResult.Status.ALREADY_CLAIMED);
-        }
-        if (!device.matchesPairingCode(command.pairingCode())) {
-            return ClaimIoTDeviceResult.of(ClaimIoTDeviceResult.Status.INVALID_PAIRING_CODE);
         }
         if (deviceRepository.findByPatientId(command.patientId()).isPresent()) {
             return ClaimIoTDeviceResult.of(ClaimIoTDeviceResult.Status.PATIENT_ALREADY_HAS_DEVICE);

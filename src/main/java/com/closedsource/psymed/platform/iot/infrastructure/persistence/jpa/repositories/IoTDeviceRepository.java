@@ -7,6 +7,7 @@ import java.util.Optional;
 
 public interface IoTDeviceRepository extends JpaRepository<IoTDevice, Long> {
     Optional<IoTDevice> findByDeviceId(String deviceId);
+    Optional<IoTDevice> findByPairingCode(String pairingCode);
     Optional<IoTDevice> findByPatientId(Long patientId);
     boolean existsByDeviceId(String deviceId);
 }

@@ -1,22 +1,6 @@
+# Backend only — database is Neon (serverless Postgres), not a local container.
+# Copy .env.example to .env and paste your Neon credentials before starting.
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: psymed-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-admin}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-psymed}
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
-    volumes:
-      - psymed_mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-admin}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
   backend:
     build:
       context: .
@@ -24,26 +8,23 @@ services:
     image: ${DOCKERHUB_USER:-psymed}/psymed-backend:${IMAGE_TAG:-latest}
     container_name: psymed-backend
     restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
+    env_file:
+      - .env
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     environment:
       SERVER_PORT: 8080
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-psymed}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-admin}
-      SPRING_JPA_DDL_AUTO: update
-      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      SPRING_JPA_DDL_AUTO: ${SPRING_JPA_DDL_AUTO:-update}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-in-production}
       JWT_EXPIRATION_DAYS: ${JWT_EXPIRATION_DAYS:-7}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 90s
-
-volumes:
-  psymed_mysql_data:

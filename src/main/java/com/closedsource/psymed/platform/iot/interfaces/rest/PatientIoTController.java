@@ -2,6 +2,7 @@ package com.closedsource.psymed.platform.iot.interfaces.rest;
 
 import com.closedsource.psymed.platform.iot.domain.model.commands.UpdateAlertStatusCommand;
 import com.closedsource.psymed.platform.iot.domain.model.queries.GetAlertsByPatientIdQuery;
+import com.closedsource.psymed.platform.iot.domain.model.queries.GetDailySummariesByPatientIdQuery;
 import com.closedsource.psymed.platform.iot.domain.model.queries.GetDailySummaryByPatientAndDateQuery;
 import com.closedsource.psymed.platform.iot.domain.model.queries.GetDeviceByPatientIdQuery;
 import com.closedsource.psymed.platform.iot.domain.services.IoTCommandService;
@@ -72,6 +73,14 @@ public class PatientIoTController {
             .map(IoTAlertResourceFromEntityAssembler::toResource)
             .collect(Collectors.toList());
         return ResponseEntity.ok(Map.of("patient_id", patientId, "alerts", resources));
+    }
+
+    @GetMapping("/{patientId}/summaries")
+    public ResponseEntity<List<DailySummaryResource>> getSummaries(@PathVariable Long patientId) {
+        var resources = iotQueryService.handle(new GetDailySummariesByPatientIdQuery(patientId)).stream()
+            .map(DailySummaryResourceFromEntityAssembler::toResource)
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(resources);
     }
 
     @GetMapping("/{patientId}/daily-summary")

@@ -28,7 +28,7 @@ public class IoTDeviceController {
     public ResponseEntity<Map<String, Object>> claimDevice(@RequestBody ClaimDeviceResource resource) {
         Long patientId = patientResolver.resolveAuthenticatedPatientId();
         var result = iotCommandService.handle(
-            new ClaimIoTDeviceCommand(resource.deviceId(), resource.pairingCode(), patientId)
+            new ClaimIoTDeviceCommand(resource.pairingCode(), patientId)
         );
 
         return switch (result.status()) {

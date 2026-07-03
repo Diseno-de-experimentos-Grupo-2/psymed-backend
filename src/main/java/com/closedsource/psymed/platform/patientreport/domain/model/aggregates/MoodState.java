@@ -8,9 +8,9 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 @Entity
@@ -58,12 +58,12 @@ public class MoodState extends AuditableAbstractAggregateRoot<MoodState> {
     }
 
     public void validateRecordAvailability(MoodState lastMoodState) {
-        Date actualDate = new Date();
-
-        LocalDate currentDay = actualDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        LocalDate lastMoodStateDate = lastMoodState.getCreatedAt().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        if (Objects.equals(currentDay, lastMoodStateDate))
-            throw new IllegalArgumentException("You can't record mood state twice in the same day");
+        // Mood states can be recorded once per hour (not just once per day).
+        LocalDateTime currentHour = LocalDateTime.now().truncatedTo(ChronoUnit.HOURS);
+        LocalDateTime lastMoodStateHour = lastMoodState.getCreatedAt().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDateTime().truncatedTo(ChronoUnit.HOURS);
+        if (Objects.equals(currentHour, lastMoodStateHour))
+            throw new IllegalArgumentException("You can't record mood state twice in the same hour");
     }
 
     public Integer getStatus() {

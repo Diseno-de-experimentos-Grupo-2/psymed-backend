@@ -4,6 +4,7 @@ import java.time.LocalDate;
 
 public record ReceiveDailySummaryCommand(
     String edgeSummaryId,
+    String deviceId,
     Long patientId,
     LocalDate date,
     String riskLevel,

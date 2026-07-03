@@ -11,5 +11,6 @@ import java.util.Optional;
 public interface IoTQueryService {
     List<IoTAlert> handle(GetAlertsByPatientIdQuery query);
     Optional<DailyHealthSummary> handle(GetDailySummaryByPatientAndDateQuery query);
+    List<DailyHealthSummary> handle(GetDailySummariesByPatientIdQuery query);
     Optional<IoTDevice> handle(GetDeviceByPatientIdQuery query);
 }

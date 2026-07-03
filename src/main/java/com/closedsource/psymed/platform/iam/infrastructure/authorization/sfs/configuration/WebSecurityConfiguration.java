@@ -4,6 +4,7 @@ import com.closedsource.psymed.platform.iam.infrastructure.authorization.sfs.pip
 import com.closedsource.psymed.platform.iam.infrastructure.hashing.bcrypt.BCryptHashingService;
 import com.closedsource.psymed.platform.iam.infrastructure.tokens.jwt.BearerTokenService;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -21,6 +22,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -31,6 +33,8 @@ public class WebSecurityConfiguration {
     private final BCryptHashingService hashingService;
     private final AuthenticationEntryPoint unauthorizedRequestHandlerEntryPoint;
 
+    @Value("${cors.allowed-origins:*}")
+    private String allowedOrigins;
 
     public WebSecurityConfiguration(@Qualifier("defaultUserDetailsService") UserDetailsService userDetailsService, BearerTokenService bearerTokenService, BCryptHashingService hashingService, AuthenticationEntryPoint unauthorizedRequestHandlerEntryPoint) {
         this.userDetailsService = userDetailsService;
@@ -64,10 +68,14 @@ public class WebSecurityConfiguration {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // CORS default configuration
+        // CORS configuration (origins configurable via CORS_ALLOWED_ORIGINS env var)
+        var originPatterns = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
         http.cors(configurer -> configurer.configurationSource(request -> {
             var cors = new CorsConfiguration();
-            cors.setAllowedOrigins(List.of("*"));
+            cors.setAllowedOriginPatterns(originPatterns.isEmpty() ? List.of("*") : originPatterns);
             cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
             cors.setAllowedHeaders(List.of("*"));
             return cors;

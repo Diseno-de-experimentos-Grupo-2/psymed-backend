@@ -20,17 +20,26 @@ public class ReceiveDailySummaryCommandFromResourceAssembler {
         }
         return new ReceiveDailySummaryCommand(
             resource.edgeSummaryId(),
+            resource.deviceId(),
             resource.patientId(),
             resource.date(),
             resource.riskLevel(),
             resource.summaryText(),
-            m.containsKey("total_readings") ? ((Number) m.get("total_readings")).intValue() : null,
-            m.containsKey("avg_heart_rate") ? ((Number) m.get("avg_heart_rate")).doubleValue() : null,
-            m.containsKey("max_heart_rate") ? ((Number) m.get("max_heart_rate")).intValue() : null,
-            m.containsKey("avg_temperature_c") ? ((Number) m.get("avg_temperature_c")).doubleValue() : null,
-            m.containsKey("alert_count") ? ((Number) m.get("alert_count")).intValue() : null,
-            m.containsKey("disconnected_minutes") ? ((Number) m.get("disconnected_minutes")).intValue() : null,
+            intOrNull(m.get("total_readings")),
+            doubleOrNull(m.get("avg_heart_rate")),
+            intOrNull(m.get("max_heart_rate")),
+            doubleOrNull(m.get("avg_temperature_c")),
+            intOrNull(m.get("alert_count")),
+            intOrNull(m.get("disconnected_minutes")),
             metricsJson
         );
+    }
+
+    private static Integer intOrNull(Object value) {
+        return value instanceof Number n ? n.intValue() : null;
+    }
+
+    private static Double doubleOrNull(Object value) {
+        return value instanceof Number n ? n.doubleValue() : null;
     }
 }

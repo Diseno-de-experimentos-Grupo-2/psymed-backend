@@ -1,134 +1,99 @@
-# Despliegue con Docker — PsyMed Backend
+# Docker — PsyMed Backend (Neon Postgres)
 
-Backend Spring Boot containerizado para despliegue local y publicación en **Docker Hub**.
+Run **only the Spring Boot backend** in Docker. The database lives on **[Neon](https://neon.tech)** (serverless Postgres). Inspect data with the **Neon VS Code extension** or any Postgres:PG client.
 
-## Requisitos
+## Prerequisites
 
-- Docker Desktop (Windows/Mac) o Docker Engine + Compose (Linux)
-- Cuenta en [Docker Hub](https://hub.docker.com/) (para publicar imagen)
+- Docker Desktop
+- A Neon project ([console.neon.tech](https://console.neon.tech))
+- Backend `.env` with Neon JDBC credentials
 
-## Arranque local (backend + MySQL)
+## 1. Neon setup
+
+1. Create a project/database in the Neon console.
+2. Open **Connection details** → choose **JDBC** (or copy host, database, user, password).
+3. Build the URL (SSL is required):
+
+```text
+jdbc:postgresql://<host>/<database>?sslmode=require
+```
+
+Example:
+
+```text
+jdbc:postgresql://ep-cool-name-123456.us-east-2.aws.neon.tech/neondb?sslmode=require
+```
+
+## 2. Backend `.env`
 
 ```powershell
 cd backend
 copy .env.example .env
+```
+
+Edit `.env` and set:
+
+| Variable | Source |
+|---|---|
+| `SPRING_DATASOURCE_URL` | Neon JDBC URL (with `?sslmode=require`) |
+| `SPRING_DATASOURCE_USERNAME` | Neon user |
+| `SPRING_DATASOURCE_PASSWORD` | Neon password |
+
+On first start, Hibernate `ddl-auto=update` creates/updates tables. Seeders add demo users (`dina`/`dinadina`, `pro`/`propropro`) and IoT device `ESP32_001` (pairing code `123456`).
+
+## 3. Start backend
+
+```powershell
+cd backend
 docker compose up --build
 ```
 
-Servicios:
-
-| Servicio | URL |
+| Service | URL |
 |---|---|
-| Backend API | http://localhost:8080 |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
-| Health check | http://localhost:8080/actuator/health |
-| MySQL | localhost:3306 (usuario `root`) |
+| API | http://localhost:8080 |
+| Swagger | http://localhost:8080/swagger-ui.html |
+| Health | http://localhost:8080/actuator/health |
 
-Detener:
+Stop:
 
 ```powershell
 docker compose down
 ```
 
-Detener y borrar datos MySQL:
+## 4. VS Code — Neon extension
 
-```powershell
-docker compose down -v
-```
+1. Install the **[Neon](https://marketplace.visualstudio.com/items?itemName=neon-com.neon)** extension (or **PostgreSQL** / **SQLTools** with a Postgres driver).
+2. Sign in to Neon or paste the connection string from the Neon dashboard.
+3. Browse tables (`account`, `patient_profile`, `iot_device`, etc.) after the backend has started once.
 
-## Construir imagen para Docker Hub
+Neon console also has a built-in SQL editor if you prefer the web UI.
 
-Reemplaza `TU_USUARIO` por tu usuario de Docker Hub:
+## 5. Edge Server (IoT)
 
-```powershell
-cd backend
-docker login
-
-# Build con tag para Docker Hub
-docker build -t TU_USUARIO/psymed-backend:latest .
-
-# Probar la imagen localmente (requiere MySQL accesible)
-docker run --rm -p 8080:8080 ^
-  -e SPRING_DATASOURCE_URL="jdbc:mysql://host.docker.internal:3306/psymed?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true" ^
-  -e SPRING_DATASOURCE_USERNAME=root ^
-  -e SPRING_DATASOURCE_PASSWORD=admin ^
-  -e JWT_SECRET=mi-secreto-jwt ^
-  TU_USUARIO/psymed-backend:latest
-```
-
-Publicar en Docker Hub:
-
-```powershell
-docker push TU_USUARIO/psymed-backend:latest
-```
-
-Etiquetar versión específica (recomendado):
-
-```powershell
-docker tag TU_USUARIO/psymed-backend:latest TU_USUARIO/psymed-backend:0.0.1
-docker push TU_USUARIO/psymed-backend:0.0.1
-```
-
-## Desplegar en servidor (solo imagen de Docker Hub)
-
-En el servidor de producción/staging:
-
-```bash
-docker pull TU_USUARIO/psymed-backend:latest
-
-docker run -d --name psymed-backend \
-  --restart unless-stopped \
-  -p 8080:8080 \
-  -e SPRING_DATASOURCE_URL="jdbc:mysql://MYSQL_HOST:3306/psymed?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true" \
-  -e SPRING_DATASOURCE_USERNAME=root \
-  -e SPRING_DATASOURCE_PASSWORD=TU_PASSWORD \
-  -e JWT_SECRET=TU_JWT_SECRET_LARGO \
-  -e SPRING_JPA_DDL_AUTO=update \
-  TU_USUARIO/psymed-backend:latest
-```
-
-O con `docker-compose.yml` apuntando a imagen remota (sin build local):
-
-```yaml
-backend:
-  image: TU_USUARIO/psymed-backend:latest
-  # ... resto de environment igual que docker-compose.yml
-```
-
-## Variables de entorno
-
-| Variable | Descripción | Default |
-|---|---|---|
-| `SERVER_PORT` | Puerto HTTP | `8080` |
-| `SPRING_DATASOURCE_URL` | JDBC MySQL | localhost |
-| `SPRING_DATASOURCE_USERNAME` | Usuario DB | `root` |
-| `SPRING_DATASOURCE_PASSWORD` | Password DB | `admin` |
-| `SPRING_JPA_DDL_AUTO` | Hibernate DDL | `update` |
-| `JWT_SECRET` | Secreto JWT | (cambiar en prod) |
-| `JWT_EXPIRATION_DAYS` | Expiración token | `7` |
-
-## Integración IoT (Edge Server → Backend)
-
-Con el backend en Docker, configura el Edge Server:
+Point the Edge at the Docker backend on your host:
 
 ```env
 CENTRAL_BACKEND_URL=http://localhost:8080
 ```
 
-Endpoints IoT expuestos (sin JWT, para Edge):
-
-- `POST /api/iot/alerts`
-- `POST /api/iot/daily-summary`
-
-Endpoints Flutter (requieren JWT):
-
-- `GET /api/patient/{id}/dashboard`
-- `GET /api/patient/{id}/alerts`
-- `GET /api/patient/{id}/daily-summary`
-
-## Script rápido de publicación
+## 6. Docker Hub (optional)
 
 ```powershell
-cd backend
-.\scripts\docker-publish.ps1 -DockerHubUser TU_USUARIO -Tag latest
+docker login
+docker build -t TU_USUARIO/psymed-backend:latest .
+docker push TU_USUARIO/psymed-backend:latest
 ```
+
+Use the same Neon env vars when running on Render or any host — only the backend container is deployed; Postgres stays on Neon.
+
+## Environment reference
+
+| Variable | Description |
+|---|---|
+| `SPRING_DATASOURCE_URL` | Neon JDBC URL |
+| `SPRING_DATASOURCE_USERNAME` | Neon user |
+| `SPRING_DATASOURCE_PASSWORD` | Neon password |
+| `SPRING_JPA_DDL_AUTO` | Default `update` |
+| `JWT_SECRET` | JWT signing secret |
+| `CORS_ALLOWED_ORIGINS` | Frontend origin(s) |
+| `BACKEND_PORT` | Host port (default `8080`) |

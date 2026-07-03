@@ -41,6 +41,11 @@ public class IoTQueryServiceImpl implements IoTQueryService {
     }
 
     @Override
+    public List<DailyHealthSummary> handle(GetDailySummariesByPatientIdQuery query) {
+        return summaryRepository.findByPatientIdOrderBySummaryDateDesc(query.patientId());
+    }
+
+    @Override
     public Optional<IoTDevice> handle(GetDeviceByPatientIdQuery query) {
         return deviceRepository.findByPatientId(query.patientId());
     }
